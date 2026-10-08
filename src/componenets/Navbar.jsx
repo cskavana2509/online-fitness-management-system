@@ -1,55 +1,31 @@
-import { useNavigate } from "react-router-dom";
-
-import { useAuth } from "../context/AuthContext";
+import { useContext } from "react";
+import { Link } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 
 function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useContext(AuthContext);
 
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    try {
-      await logout();
-      navigate("/login");
-    } catch (error) {
-      alert(error.message);
-    }
-  }
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
     <header className="navbar">
-
-      <div className="mobile-brand">
-        FitManage
+      <div className="navbar-left">
+        <Link to="/" className="navbar-brand">
+          Fitness Management System
+        </Link>
       </div>
 
       <div className="navbar-right">
-
         {user && (
           <>
-            <div className="user-info">
-
-              <div className="user-avatar">
-                {user.email
-                  ?.charAt(0)
-                  .toUpperCase()}
-              </div>
-
-              <div className="user-text">
-
-                <strong>
-                  Admin
-                </strong>
-
-                <span>
-                  {user.email}
-                </span>
-
-              </div>
-
-            </div>
+            <span className="navbar-user">
+              {user.email}
+            </span>
 
             <button
+              type="button"
               className="logout-button"
               onClick={handleLogout}
             >
@@ -57,9 +33,7 @@ function Navbar() {
             </button>
           </>
         )}
-
       </div>
-
     </header>
   );
 }

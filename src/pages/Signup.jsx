@@ -2,13 +2,12 @@ import { useState } from "react";
 
 import {
   Link,
-  useNavigate
+  useNavigate,
 } from "react-router-dom";
 
 import { supabase } from "../supabase";
 
 function Signup() {
-
   const navigate = useNavigate();
 
   const [email, setEmail] =
@@ -29,195 +28,200 @@ function Signup() {
   const [loading, setLoading] =
     useState(false);
 
-  async function handleSubmit(e) {
-
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
     setError("");
     setMessage("");
 
-    if (
-      !email ||
-      !password ||
-      !confirmPassword
-    ) {
-
+    if (!email.trim()) {
       setError(
-        "Please fill in all fields."
+        "Please enter your email."
       );
-
       return;
     }
 
     if (password.length < 6) {
-
       setError(
         "Password must be at least 6 characters."
       );
-
       return;
     }
 
     if (
       password !== confirmPassword
     ) {
-
       setError(
         "Passwords do not match."
       );
-
       return;
     }
 
+    if (!supabase) {
+      setError(
+        "Supabase is not configured. Please check your environment variables."
+      );
+      return;
+    }
+
+    setLoading(true);
+
     try {
-
-      setLoading(true);
-
       const {
         data,
-        error
+        error: signupError,
       } = await supabase.auth.signUp({
-        email,
-        password
+        email: email.trim(),
+        password,
       });
 
-      if (error) {
-        throw error;
-      }
-
-      if (data.session) {
-
-        navigate("/");
-
-      } else {
-
-        setMessage(
-          "Account created. Please check your email for verification."
+      if (signupError) {
+        setError(
+          signupError.message
         );
-
+        return;
       }
 
+      if (data?.session) {
+        navigate("/");
+        return;
+      }
+
+      setMessage(
+        "Account created successfully. Please check your email to confirm your account."
+      );
     } catch (error) {
+      console.error(error);
 
-      setError(error.message);
-
+      setError(
+        "Unable to create account. Please try again."
+      );
     } finally {
-
       setLoading(false);
-
     }
-  }
+  };
 
   return (
     <div className="auth-page">
 
       <div className="auth-card">
 
-        <div className="auth-logo">
-          F
+        <div className="auth-header">
+
+          <div className="auth-logo">
+            💪
+          </div>
+
+          <h1>
+            Create Account
+          </h1>
+
+          <p>
+            Create your fitness account
+          </p>
+
         </div>
 
-        <h1>
-          Create Account
-        </h1>
-
-        <p className="auth-subtitle">
-          Create your FitManage account
-        </p>
-
         {error && (
-          <div className="error-message">
+          <div className="alert error-alert">
             {error}
           </div>
         )}
 
         {message && (
-          <div className="success-message">
+          <div className="alert success-alert">
             {message}
           </div>
         )}
 
-        <form
-          className="auth-form"
-          onSubmit={handleSubmit}
-        >
+        <form onSubmit={handleSubmit}>
 
-          <div className="input-group">
+          <div className="form-group">
 
-            <label>
+            <label htmlFor="signup-email">
               Email
             </label>
 
             <input
+              id="signup-email"
               type="email"
-              placeholder="Enter your email"
               value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
+              onChange={(event) =>
+                setEmail(
+                  event.target.value
+                )
               }
+              placeholder="Enter your email"
+              autoComplete="email"
             />
 
           </div>
 
-          <div className="input-group">
+          <div className="form-group">
 
-            <label>
+            <label htmlFor="signup-password">
               Password
             </label>
 
             <input
+              id="signup-password"
               type="password"
-              placeholder="Minimum 6 characters"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
+              onChange={(event) =>
+                setPassword(
+                  event.target.value
+                )
               }
+              placeholder="Minimum 6 characters"
+              autoComplete="new-password"
             />
 
           </div>
 
-          <div className="input-group">
+          <div className="form-group">
 
-            <label>
+            <label htmlFor="confirm-password">
               Confirm Password
             </label>
 
             <input
+              id="confirm-password"
               type="password"
-              placeholder="Confirm password"
               value={confirmPassword}
-              onChange={(e) =>
+              onChange={(event) =>
                 setConfirmPassword(
-                  e.target.value
+                  event.target.value
                 )
               }
+              placeholder="Confirm password"
+              autoComplete="new-password"
             />
 
           </div>
 
           <button
             type="submit"
-            className="auth-button"
+            className="primary-button auth-button"
             disabled={loading}
           >
             {loading
               ? "Creating..."
-              : "Create Account"}
+              : "Sign Up"}
           </button>
 
         </form>
 
-        <p className="auth-footer">
+        <div className="auth-footer">
 
-          Already have an account?
-
-          {" "}
+          <span>
+            Already have an account?
+          </span>
 
           <Link to="/login">
             Login
           </Link>
 
-        </p>
+        </div>
 
       </div>
 

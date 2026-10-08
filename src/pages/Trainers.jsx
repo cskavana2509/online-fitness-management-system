@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   getTrainers,
   createTrainer,
@@ -6,101 +7,135 @@ import {
   deleteTrainer,
 } from "../services/trainerService";
 
-const emptyForm = {
-  name: "",
-  email: "",
-  phone: "",
-  specialization: "",
-  experience_years: "",
-  bio: "",
-};
-
 function Trainers() {
   const [trainers, setTrainers] = useState([]);
-  const [filteredTrainers, setFilteredTrainers] = useState([]);
-
-  const [formData, setFormData] = useState(emptyForm);
-
-  const [editingId, setEditingId] = useState(null);
-
-  const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [search, setSearch] = useState("");
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    specialization: "",
+  });
 
   useEffect(() => {
     loadTrainers();
   }, []);
 
-  useEffect(() => {
-    filterTrainers();
-  }, [search, trainers]);
-
-  const loadTrainers = async () => {
+  async function loadTrainers() {
     setLoading(true);
     setError("");
 
-    const { data, error } = await getTrainers();
+    try {
+      const data = await getTrainers();
 
-    if (error) {
-      setError(error.message || "Unable to load trainers.");
-    } else {
-      setTrainers(data || []);
+      setTrainers(
+        Array.isArray(data) ? data : []
+      );
+    } catch (err) {
+      console.error(
+        "Error loading trainers:",
+        err
+      );
+
+      setTrainers([]);
+
+      setError(
+        err?.message ||
+          "Unable to load trainers."
+      );
+    } finally {
+      setLoading(false);
     }
+  }
 
-    setLoading(false);
-  };
+  function handleChange(event) {
+    const { name, value } =
+      event.target;
 
-  const filterTrainers = () => {
-    const searchValue = search.trim().toLowerCase();
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
 
-    if (!searchValue) {
-      setFilteredTrainers(trainers);
+  function openAddForm() {
+    setEditingId(null);
+
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+      specialization: "",
+    });
+
+    setError("");
+    setShowForm(true);
+  }
+
+  function openEditForm(trainer) {
+    setEditingId(trainer.id);
+
+    setForm({
+      name: trainer.name || "",
+      email: trainer.email || "",
+      phone: trainer.phone || "",
+      specialization:
+        trainer.specialization || "",
+    });
+
+    setError("");
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    if (saving) {
       return;
     }
 
-    const filtered = trainers.filter((trainer) => {
-      return (
-        trainer.name?.toLowerCase().includes(searchValue) ||
-        trainer.email?.toLowerCase().includes(searchValue) ||
-        trainer.phone?.toLowerCase().includes(searchValue) ||
-        trainer.specialization?.toLowerCase().includes(searchValue)
-      );
+    setShowForm(false);
+    setEditingId(null);
+
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+      specialization: "",
     });
 
-    setFilteredTrainers(filtered);
-  };
+    setError("");
+  }
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-
-    setFormData((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const resetForm = () => {
-    setFormData(emptyForm);
-    setEditingId(null);
-  };
-
-  const handleSubmit = async (event) => {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     setError("");
-    setSuccess("");
 
-    if (!formData.name.trim()) {
-      setError("Trainer name is required.");
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+    const specialization =
+      form.specialization.trim();
+
+    if (!name) {
+      setError(
+        "Please enter the trainer name."
+      );
       return;
     }
 
-    if (!formData.email.trim()) {
-      setError("Email is required.");
+    if (!email) {
+      setError(
+        "Please enter the trainer email."
+      );
       return;
     }
 
@@ -108,209 +143,280 @@ function Trainers() {
 
     try {
       const trainerData = {
-        ...formData,
-        experience_years: formData.experience_years
-          ? Number(formData.experience_years)
-          : null,
+        name,
+        email,
+        phone,
+        specialization,
       };
 
-      let response;
-
       if (editingId) {
-        response = await updateTrainer(editingId, trainerData);
+        await updateTrainer(
+          editingId,
+          trainerData
+        );
       } else {
-        response = await createTrainer(trainerData);
+        await createTrainer(
+          trainerData
+        );
       }
-
-      if (response.error) {
-        setError(response.error.message || "Unable to save trainer.");
-        return;
-      }
-
-      setSuccess(
-        editingId
-          ? "Trainer updated successfully."
-          : "Trainer added successfully."
-      );
-
-      resetForm();
 
       await loadTrainers();
-    } catch (error) {
-      console.error(error);
-      setError("Something went wrong while saving the trainer.");
+
+      closeForm();
+    } catch (err) {
+      console.error(
+        "Error saving trainer:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to save trainer."
+      );
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleEdit = (trainer) => {
-    setEditingId(trainer.id);
-
-    setFormData({
-      name: trainer.name || "",
-      email: trainer.email || "",
-      phone: trainer.phone || "",
-      specialization: trainer.specialization || "",
-      experience_years:
-        trainer.experience_years !== null &&
-        trainer.experience_years !== undefined
-          ? trainer.experience_years
-          : "",
-      bio: trainer.bio || "",
-    });
-
-    setError("");
-    setSuccess("");
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const handleDelete = async (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this trainer?"
-    );
+  async function handleDelete(id) {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this trainer?"
+      );
 
     if (!confirmed) {
       return;
     }
 
     setError("");
-    setSuccess("");
 
-    const { error } = await deleteTrainer(id);
+    try {
+      await deleteTrainer(id);
 
-    if (error) {
-      setError(error.message || "Unable to delete trainer.");
-      return;
+      setTrainers((current) =>
+        current.filter(
+          (trainer) =>
+            trainer.id !== id
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error deleting trainer:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to delete trainer."
+      );
+    }
+  }
+
+  const searchText =
+    search.trim().toLowerCase();
+
+  const filteredTrainers =
+    Array.isArray(trainers)
+      ? trainers.filter((trainer) => {
+          const name = String(
+            trainer.name || ""
+          ).toLowerCase();
+
+          const email = String(
+            trainer.email || ""
+          ).toLowerCase();
+
+          const phone = String(
+            trainer.phone || ""
+          ).toLowerCase();
+
+          const specialization =
+            String(
+              trainer.specialization ||
+                ""
+            ).toLowerCase();
+
+          return (
+            name.includes(searchText) ||
+            email.includes(searchText) ||
+            phone.includes(searchText) ||
+            specialization.includes(
+              searchText
+            )
+          );
+        })
+      : [];
+
+  function formatDate(date) {
+    if (!date) {
+      return "-";
     }
 
-    setSuccess("Trainer deleted successfully.");
+    const parsed = new Date(date);
 
-    if (editingId === id) {
-      resetForm();
+    if (Number.isNaN(parsed.getTime())) {
+      return "-";
     }
 
-    await loadTrainers();
-  };
+    return parsed.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
+  }
 
   return (
     <div className="page">
+
       <div className="page-header">
         <div>
           <h1>Trainers</h1>
-          <p>Manage fitness trainers and their professional information.</p>
+
+          <p>
+            Manage your fitness trainers.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="primary-button"
+          onClick={openAddForm}
+        >
+          + Add Trainer
+        </button>
+      </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+
+      <div className="content-card">
+        <div className="search-row">
+
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search trainers..."
+            value={search}
+            onChange={(event) =>
+              setSearch(
+                event.target.value
+              )
+            }
+          />
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={loadTrainers}
+            disabled={loading}
+          >
+            {loading
+              ? "Loading..."
+              : "Refresh"}
+          </button>
+
         </div>
       </div>
 
-      {error && <div className="alert error-alert">{error}</div>}
+      {showForm && (
+        <div className="content-card">
 
-      {success && <div className="alert success-alert">{success}</div>}
-
-      <div className="content-grid">
-        <div className="form-card">
-          <div className="card-header">
+          <div className="section-header">
             <div>
-              <h2>{editingId ? "Edit Trainer" : "Add Trainer"}</h2>
+              <h2>
+                {editingId
+                  ? "Edit Trainer"
+                  : "Add Trainer"}
+              </h2>
 
               <p>
-                {editingId
-                  ? "Update trainer information."
-                  : "Create a new trainer profile."}
+                Enter trainer information.
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form
+            className="form-grid"
+            onSubmit={handleSubmit}
+          >
+
             <div className="form-group">
-              <label htmlFor="trainer-name">Full Name *</label>
+              <label>
+                Name
+              </label>
 
               <input
-                id="trainer-name"
                 name="name"
                 type="text"
-                value={formData.name}
+                value={form.name}
                 onChange={handleChange}
-                placeholder="Enter trainer name"
+                placeholder="Trainer name"
+                required
               />
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="trainer-email">Email *</label>
+            <div className="form-group">
+              <label>
+                Email
+              </label>
 
-                <input
-                  id="trainer-email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="trainer@example.com"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="trainer-phone">Phone</label>
-
-                <input
-                  id="trainer-phone"
-                  name="phone"
-                  type="text"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="Phone number"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="specialization">Specialization</label>
-
-                <input
-                  id="specialization"
-                  name="specialization"
-                  type="text"
-                  value={formData.specialization}
-                  onChange={handleChange}
-                  placeholder="e.g. Strength Training"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="experience_years">
-                  Experience (Years)
-                </label>
-
-                <input
-                  id="experience_years"
-                  name="experience_years"
-                  type="number"
-                  min="0"
-                  value={formData.experience_years}
-                  onChange={handleChange}
-                  placeholder="0"
-                />
-              </div>
+              <input
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Trainer email"
+                required
+              />
             </div>
 
             <div className="form-group">
-              <label htmlFor="bio">Bio</label>
+              <label>
+                Phone
+              </label>
 
-              <textarea
-                id="bio"
-                name="bio"
-                value={formData.bio}
+              <input
+                name="phone"
+                type="tel"
+                value={form.phone}
                 onChange={handleChange}
-                placeholder="Enter trainer biography"
-                rows="5"
+                placeholder="Phone number"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>
+                Specialization
+              </label>
+
+              <input
+                name="specialization"
+                type="text"
+                value={
+                  form.specialization
+                }
+                onChange={handleChange}
+                placeholder="e.g. Strength Training"
               />
             </div>
 
             <div className="form-actions">
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeForm}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+
               <button
                 type="submit"
                 className="primary-button"
@@ -323,92 +429,142 @@ function Trainers() {
                   : "Add Trainer"}
               </button>
 
-              {editingId && (
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </button>
-              )}
             </div>
+
           </form>
         </div>
+      )}
 
-        <div className="table-card">
-          <div className="card-header members-list-header">
-            <div>
-              <h2>Trainer List</h2>
-              <p>{filteredTrainers.length} trainer(s) found.</p>
-            </div>
+      <div className="content-card">
 
-            <div className="search-box">
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search trainers..."
-              />
-            </div>
+        <div className="section-header">
+          <div>
+            <h2>
+              All Trainers
+            </h2>
+
+            <p>
+              {filteredTrainers.length}{" "}
+              trainer
+              {filteredTrainers.length !==
+              1
+                ? "s"
+                : ""}
+            </p>
           </div>
+        </div>
 
-          {loading ? (
-            <div className="loading-box">Loading trainers...</div>
-          ) : filteredTrainers.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🏋️</div>
+        {loading ? (
+          <div className="empty-state">
+            Loading trainers...
+          </div>
+        ) : filteredTrainers.length ===
+          0 ? (
+          <div className="empty-state">
 
-              <h3>No trainers found</h3>
-
-              <p>
-                {search
-                  ? "Try changing your search."
-                  : "Add your first trainer using the form."}
-              </p>
+            <div className="empty-icon">
+              🏋️
             </div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Specialization</th>
-                    <th>Experience</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
 
-                <tbody>
-                  {filteredTrainers.map((trainer) => (
-                    <tr key={trainer.id}>
+            <h3>
+              {search
+                ? "No trainers found"
+                : "No trainers yet"}
+            </h3>
+
+            <p>
+              {search
+                ? "Try another search."
+                : "Add your first trainer to get started."}
+            </p>
+
+            {!search && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={openAddForm}
+              >
+                + Add Trainer
+              </button>
+            )}
+
+          </div>
+        ) : (
+          <div className="table-container">
+
+            <table className="data-table">
+
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Specialization</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {filteredTrainers.map(
+                  (trainer) => (
+                    <tr
+                      key={trainer.id}
+                    >
+
                       <td>
-                        <strong>{trainer.name}</strong>
+                        <div className="member-name">
+
+                          <span className="member-avatar">
+                            {(
+                              trainer.name ||
+                              "T"
+                            )
+                              .charAt(0)
+                              .toUpperCase()}
+                          </span>
+
+                          <strong>
+                            {trainer.name ||
+                              "-"}
+                          </strong>
+
+                        </div>
                       </td>
 
-                      <td>{trainer.email || "-"}</td>
-
-                      <td>{trainer.phone || "-"}</td>
-
                       <td>
-                        {trainer.specialization || "General Trainer"}
+                        {trainer.email ||
+                          "-"}
                       </td>
 
                       <td>
-                        {trainer.experience_years !== null &&
-                        trainer.experience_years !== undefined
-                          ? `${trainer.experience_years} years`
-                          : "-"}
+                        {trainer.phone ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        {trainer.specialization ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        {formatDate(
+                          trainer.created_at
+                        )}
                       </td>
 
                       <td>
                         <div className="table-actions">
+
                           <button
                             type="button"
                             className="edit-button"
-                            onClick={() => handleEdit(trainer)}
+                            onClick={() =>
+                              openEditForm(
+                                trainer
+                              )
+                            }
                           >
                             Edit
                           </button>
@@ -416,19 +572,28 @@ function Trainers() {
                           <button
                             type="button"
                             className="delete-button"
-                            onClick={() => handleDelete(trainer.id)}
+                            onClick={() =>
+                              handleDelete(
+                                trainer.id
+                              )
+                            }
                           >
                             Delete
                           </button>
+
                         </div>
                       </td>
+
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+          </div>
+        )}
+
       </div>
     </div>
   );

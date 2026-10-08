@@ -1,560 +1,529 @@
-import {
-  useEffect,
-  useState
-} from "react";
-
+import { useEffect, useState } from "react";
 import {
   getSchedules,
-  addSchedule,
+  createSchedule,
   updateSchedule,
-  deleteSchedule
+  deleteSchedule,
 } from "../services/scheduleService";
-
-import {
-  getTrainers
-} from "../services/trainerService";
+import { getTrainers } from "../services/trainerService";
 
 function Schedules() {
+  const [schedules, setSchedules] = useState([]);
+  const [trainers, setTrainers] = useState([]);
 
-  const emptyForm = {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const [form, setForm] = useState({
     title: "",
-    trainer_id: "",
     schedule_date: "",
     start_time: "",
     end_time: "",
-    capacity: 20
-  };
-
-  const [schedules, setSchedules] =
-    useState([]);
-
-  const [trainers, setTrainers] =
-    useState([]);
-
-  const [form, setForm] =
-    useState(emptyForm);
-
-  const [editingId, setEditingId] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  async function loadData() {
-
-    try {
-
-      const [
-        scheduleData,
-        trainerData
-      ] = await Promise.all([
-        getSchedules(),
-        getTrainers()
-      ]);
-
-      setSchedules(scheduleData);
-      setTrainers(trainerData);
-
-    } catch (error) {
-
-      alert(error.message);
-
-    }
-  }
+    trainer_id: "",
+    capacity: 20,
+  });
 
   useEffect(() => {
     loadData();
   }, []);
 
-  function handleChange(e) {
-
-    setForm({
-      ...form,
-      [e.target.name]:
-        e.target.value
-    });
-  }
-
-  async function handleSubmit(e) {
-
-    e.preventDefault();
-
-    if (
-      !form.title.trim() ||
-      !form.schedule_date ||
-      !form.start_time ||
-      !form.end_time
-    ) {
-
-      alert(
-        "Please fill all required fields."
-      );
-
-      return;
-    }
+  async function loadData() {
+    setLoading(true);
+    setError("");
 
     try {
+      const [scheduleData, trainerData] = await Promise.all([
+        getSchedules(),
+        getTrainers(),
+      ]);
 
-      setLoading(true);
-
-      const schedule = {
-
-        title:
-          form.title.trim(),
-
-        trainer_id:
-          form.trainer_id
-            ? Number(
-                form.trainer_id
-              )
-            : null,
-
-        schedule_date:
-          form.schedule_date,
-
-        start_time:
-          form.start_time,
-
-        end_time:
-          form.end_time,
-
-        capacity:
-          form.capacity
-            ? Number(form.capacity)
-            : 20
-      };
-
-      if (editingId) {
-
-        await updateSchedule(
-          editingId,
-          schedule
-        );
-
-        alert(
-          "Schedule updated successfully."
-        );
-
-      } else {
-
-        await addSchedule(
-          schedule
-        );
-
-        alert(
-          "Schedule added successfully."
-        );
-
-      }
-
-      setForm(emptyForm);
-      setEditingId(null);
-
-      await loadData();
-
-    } catch (error) {
-
-      alert(error.message);
-
+      setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
+      setTrainers(Array.isArray(trainerData) ? trainerData : []);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to load schedules.");
     } finally {
-
       setLoading(false);
-
     }
+  }
+
+  function handleChange(e) {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
+  function resetForm() {
+    setForm({
+      title: "",
+      schedule_date: "",
+      start_time: "",
+      end_time: "",
+      trainer_id: "",
+      capacity: 20,
+    });
+
+    setEditingId(null);
+    setShowForm(false);
+  }
+
+  function handleAddClick() {
+    setError("");
+
+    setForm({
+      title: "",
+      schedule_date: "",
+      start_time: "",
+      end_time: "",
+      trainer_id: "",
+      capacity: 20,
+    });
+
+    setEditingId(null);
+    setShowForm(true);
   }
 
   function handleEdit(schedule) {
-
-    setEditingId(schedule.id);
+    setError("");
 
     setForm({
-
-      title:
-        schedule.title || "",
-
-      trainer_id:
-        schedule.trainer_id || "",
-
-      schedule_date:
-        schedule.schedule_date || "",
-
-      start_time:
-        schedule.start_time || "",
-
-      end_time:
-        schedule.end_time || "",
-
-      capacity:
-        schedule.capacity || 20
-
+      title: schedule.title || "",
+      schedule_date: schedule.schedule_date || "",
+      start_time: schedule.start_time
+        ? schedule.start_time.slice(0, 5)
+        : "",
+      end_time: schedule.end_time
+        ? schedule.end_time.slice(0, 5)
+        : "",
+      trainer_id: schedule.trainer_id
+        ? String(schedule.trainer_id)
+        : "",
+      capacity: schedule.capacity ?? 20,
     });
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+    setEditingId(schedule.id);
+    setShowForm(true);
   }
 
-  async function handleDelete(id) {
+  async function handleSubmit(e) {
+    e.preventDefault();
 
-    if (
-      !window.confirm(
-        "Delete this schedule?"
-      )
-    ) {
+    setError("");
+
+    if (!form.title.trim()) {
+      setError("Please enter a schedule title.");
+      return;
+    }
+
+    if (!form.schedule_date) {
+      setError("Please select a date.");
+      return;
+    }
+
+    if (!form.start_time) {
+      setError("Please select a start time.");
+      return;
+    }
+
+    if (!form.end_time) {
+      setError("Please select an end time.");
+      return;
+    }
+
+    if (form.end_time <= form.start_time) {
+      setError("End time must be later than start time.");
       return;
     }
 
     try {
+      const payload = {
+        title: form.title.trim(),
+        schedule_date: form.schedule_date,
+        start_time: form.start_time,
+        end_time: form.end_time,
+        trainer_id: form.trainer_id
+          ? Number(form.trainer_id)
+          : null,
+        capacity: Number(form.capacity) || 20,
+      };
 
-      await deleteSchedule(id);
+      if (editingId) {
+        await updateSchedule(editingId, payload);
+      } else {
+        await createSchedule(payload);
+      }
 
+      resetForm();
       await loadData();
-
-    } catch (error) {
-
-      alert(error.message);
-
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to save schedule.");
     }
   }
 
-  function cancelEdit() {
+  async function handleDelete(id) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this schedule?"
+    );
 
-    setEditingId(null);
-    setForm(emptyForm);
+    if (!confirmed) return;
 
+    setError("");
+
+    try {
+      await deleteSchedule(id);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to delete schedule.");
+    }
+  }
+
+  function getTrainerName(trainerId) {
+    const trainer = trainers.find(
+      (item) => String(item.id) === String(trainerId)
+    );
+
+    return trainer?.name || "Unassigned";
+  }
+
+  function formatDate(date) {
+    if (!date) return "-";
+
+    const value = new Date(`${date}T00:00:00`);
+
+    return value.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function formatTime(time) {
+    if (!time) return "-";
+
+    const [hour, minute] = time.split(":");
+
+    const date = new Date();
+
+    date.setHours(Number(hour));
+    date.setMinutes(Number(minute));
+    date.setSeconds(0);
+
+    return date.toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   }
 
   return (
     <div className="page">
-
       <div className="page-header">
-
         <div>
-
-          <h1>
-            Schedules
-          </h1>
+          <h1>Schedules</h1>
 
           <p>
-            Manage classes and training sessions.
+            Manage fitness training schedules.
           </p>
-
         </div>
 
-        <span className="record-count">
-          {schedules.length} Sessions
-        </span>
-
+        <button
+          className="primary-btn"
+          onClick={handleAddClick}
+        >
+          + Add Schedule
+        </button>
       </div>
 
-      <div className="form-card">
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
 
-        <h2>
-          {editingId
-            ? "Edit Schedule"
-            : "Create Schedule"}
-        </h2>
+      {showForm && (
+        <div className="form-card">
+          <div className="card-header">
+            <div>
+              <h2>
+                {editingId
+                  ? "Edit Schedule"
+                  : "Add Schedule"}
+              </h2>
 
-        <form
-          className="management-form"
-          onSubmit={handleSubmit}
-        >
-
-          <div className="input-group">
-
-            <label>
-              Session Name *
-            </label>
-
-            <input
-              name="title"
-              placeholder="Morning Strength Training"
-              value={form.title}
-              onChange={handleChange}
-            />
-
+              <p>
+                Create a training session and assign a trainer.
+              </p>
+            </div>
           </div>
 
-          <div className="input-group">
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label htmlFor="title">
+                Title
+              </label>
 
-            <label>
-              Trainer
-            </label>
+              <input
+                id="title"
+                name="title"
+                type="text"
+                value={form.title}
+                onChange={handleChange}
+                placeholder="Example: Morning Strength Training"
+              />
+            </div>
 
-            <select
-              name="trainer_id"
-              value={
-                form.trainer_id
-              }
-              onChange={handleChange}
+            <div className="form-group">
+              <label htmlFor="schedule_date">
+                Date
+              </label>
+
+              <input
+                id="schedule_date"
+                name="schedule_date"
+                type="date"
+                value={form.schedule_date}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "15px",
+              }}
             >
+              <div className="form-group">
+                <label htmlFor="start_time">
+                  Start Time
+                </label>
 
-              <option value="">
-                Select trainer
-              </option>
+                <input
+                  id="start_time"
+                  name="start_time"
+                  type="time"
+                  value={form.start_time}
+                  onChange={handleChange}
+                />
+              </div>
 
-              {trainers.map(
-                (trainer) => (
+              <div className="form-group">
+                <label htmlFor="end_time">
+                  End Time
+                </label>
 
+                <input
+                  id="end_time"
+                  name="end_time"
+                  type="time"
+                  value={form.end_time}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="trainer_id">
+                Trainer
+              </label>
+
+              <select
+                id="trainer_id"
+                name="trainer_id"
+                value={form.trainer_id}
+                onChange={handleChange}
+              >
+                <option value="">
+                  Select Trainer
+                </option>
+
+                {trainers.map((trainer) => (
                   <option
                     key={trainer.id}
                     value={trainer.id}
                   >
                     {trainer.name}
                   </option>
+                ))}
+              </select>
+            </div>
 
-                )
-              )}
+            <div className="form-group">
+              <label htmlFor="capacity">
+                Capacity
+              </label>
 
-            </select>
+              <input
+                id="capacity"
+                name="capacity"
+                type="number"
+                min="1"
+                value={form.capacity}
+                onChange={handleChange}
+              />
+            </div>
 
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Date *
-            </label>
-
-            <input
-              name="schedule_date"
-              type="date"
-              value={
-                form.schedule_date
-              }
-              onChange={handleChange}
-            />
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Start Time *
-            </label>
-
-            <input
-              name="start_time"
-              type="time"
-              value={
-                form.start_time
-              }
-              onChange={handleChange}
-            />
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              End Time *
-            </label>
-
-            <input
-              name="end_time"
-              type="time"
-              value={
-                form.end_time
-              }
-              onChange={handleChange}
-            />
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Capacity
-            </label>
-
-            <input
-              name="capacity"
-              type="number"
-              min="1"
-              value={
-                form.capacity
-              }
-              onChange={handleChange}
-            />
-
-          </div>
-
-          <div className="form-buttons">
-
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={loading}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+              }}
             >
-              {loading
-                ? "Saving..."
-                : editingId
-                ? "Update Schedule"
-                : "Add Schedule"}
-            </button>
-
-            {editingId && (
+              <button type="submit">
+                {editingId
+                  ? "Update Schedule"
+                  : "Add Schedule"}
+              </button>
 
               <button
                 type="button"
-                className="secondary-button"
-                onClick={cancelEdit}
+                onClick={resetForm}
+                style={{
+                  background: "#f1f3f5",
+                  color: "#555",
+                }}
               >
                 Cancel
               </button>
+            </div>
+          </form>
+        </div>
+      )}
 
-            )}
-
-          </div>
-
-        </form>
-
-      </div>
-
-      <div className="table-card">
-
-        <div className="table-header">
-
+      <div className="content-card">
+        <div className="section-header">
           <div>
-
-            <h2>
-              Training Schedule
-            </h2>
+            <h2>All Schedules</h2>
 
             <p>
-              All scheduled training sessions.
+              {schedules.length}{" "}
+              {schedules.length === 1
+                ? "schedule"
+                : "schedules"}
             </p>
-
           </div>
 
+          <button
+            type="button"
+            onClick={loadData}
+          >
+            Refresh
+          </button>
         </div>
 
-        <div className="table-container">
+        {loading ? (
+          <div className="loading">
+            <div className="spinner"></div>
+          </div>
+        ) : schedules.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              📅
+            </div>
 
-          <table>
+            <h3>
+              No schedules yet
+            </h3>
 
-            <thead>
+            <p>
+              Add your first training schedule.
+            </p>
 
-              <tr>
+            <button
+              className="primary-btn"
+              onClick={handleAddClick}
+            >
+              + Add Schedule
+            </button>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Trainer</th>
+                  <th>Capacity</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
 
-                <th>
-                  Session
-                </th>
-
-                <th>
-                  Trainer
-                </th>
-
-                <th>
-                  Date
-                </th>
-
-                <th>
-                  Time
-                </th>
-
-                <th>
-                  Capacity
-                </th>
-
-                <th>
-                  Actions
-                </th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {schedules.map(
-                (schedule) => (
-
-                  <tr
-                    key={schedule.id}
-                  >
-
+              <tbody>
+                {schedules.map((schedule) => (
+                  <tr key={schedule.id}>
                     <td>
-
                       <strong>
                         {schedule.title}
                       </strong>
-
                     </td>
 
                     <td>
-                      {schedule.trainers?.name ||
-                        "Not assigned"}
+                      {formatDate(
+                        schedule.schedule_date
+                      )}
                     </td>
 
                     <td>
-                      {schedule.schedule_date}
-                    </td>
-
-                    <td>
-
-                      {schedule.start_time}
+                      {formatTime(
+                        schedule.start_time
+                      )}
                       {" - "}
-                      {schedule.end_time}
-
+                      {formatTime(
+                        schedule.end_time
+                      )}
                     </td>
 
                     <td>
-
-                      <span className="capacity-badge">
-                        {schedule.capacity}
-                      </span>
-
+                      {getTrainerName(
+                        schedule.trainer_id
+                      )}
                     </td>
 
                     <td>
-
-                      <button
-                        className="small-button"
-                        onClick={() =>
-                          handleEdit(
-                            schedule
-                          )
-                        }
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="small-button delete-button"
-                        onClick={() =>
-                          handleDelete(
-                            schedule.id
-                          )
-                        }
-                      >
-                        Delete
-                      </button>
-
+                      {schedule.capacity ?? 20}
                     </td>
 
+                    <td>
+                      <div className="actions">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleEdit(schedule)
+                          }
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          className="delete"
+                          onClick={() =>
+                            handleDelete(
+                              schedule.id
+                            )
+                          }
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-
-                )
-              )}
-
-            </tbody>
-
-          </table>
-
-          {schedules.length === 0 && (
-
-            <div className="empty-message">
-              No schedules found.
-            </div>
-
-          )}
-
-        </div>
-
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
     </div>
   );
 }

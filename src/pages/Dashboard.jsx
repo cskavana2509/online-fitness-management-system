@@ -1,318 +1,314 @@
-import {
-  useEffect,
-  useState
-} from "react";
-
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../supabase";
 
-import DashboardCard
-  from "../components/DashboardCard";
-
 function Dashboard() {
+  const [members, setMembers] = useState(0);
+  const [trainers, setTrainers] = useState(0);
+  const [schedules, setSchedules] = useState(0);
+  const [workoutPlans, setWorkoutPlans] = useState(0);
 
-  const [stats, setStats] =
-    useState({
-      members: 0,
-      trainers: 0,
-      schedules: 0,
-      workoutPlans: 0
-    });
+  const [upcomingSchedules, setUpcomingSchedules] = useState([]);
 
-  const [schedules, setSchedules] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  async function loadDashboard() {
-
-    try {
-
-      setLoading(true);
-
-      const [
-        members,
-        trainers,
-        schedulesCount,
-        plans
-      ] = await Promise.all([
-
-        supabase
-          .from("members")
-          .select("*", {
-            count: "exact",
-            head: true
-          }),
-
-        supabase
-          .from("trainers")
-          .select("*", {
-            count: "exact",
-            head: true
-          }),
-
-        supabase
-          .from("schedules")
-          .select("*", {
-            count: "exact",
-            head: true
-          }),
-
-        supabase
-          .from("workout_plans")
-          .select("*", {
-            count: "exact",
-            head: true
-          })
-
-      ]);
-
-      if (members.error) {
-        throw members.error;
-      }
-
-      if (trainers.error) {
-        throw trainers.error;
-      }
-
-      if (schedulesCount.error) {
-        throw schedulesCount.error;
-      }
-
-      if (plans.error) {
-        throw plans.error;
-      }
-
-      setStats({
-
-        members:
-          members.count || 0,
-
-        trainers:
-          trainers.count || 0,
-
-        schedules:
-          schedulesCount.count || 0,
-
-        workoutPlans:
-          plans.count || 0
-
-      });
-
-      const today =
-        new Date()
-          .toISOString()
-          .split("T")[0];
-
-      const {
-        data,
-        error
-      } = await supabase
-        .from("schedules")
-        .select(`
-          *,
-          trainers (
-            name
-          )
-        `)
-        .gte(
-          "schedule_date",
-          today
-        )
-        .order(
-          "schedule_date",
-          {
-            ascending: true
-          }
-        )
-        .order(
-          "start_time",
-          {
-            ascending: true
-          }
-        )
-        .limit(5);
-
-      if (error) {
-        throw error;
-      }
-
-      setSchedules(data || []);
-
-    } catch (error) {
-
-      console.error(error);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-  }
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadDashboard();
   }, []);
 
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const membersResult = await supabase
+        .from("members")
+        .select("*", { count: "exact", head: true });
+
+      const trainersResult = await supabase
+        .from("trainers")
+        .select("*", { count: "exact", head: true });
+
+      const schedulesResult = await supabase
+        .from("schedules")
+        .select("*")
+        .order("schedule_date", {
+          ascending: true,
+        })
+        .order("start_time", {
+          ascending: true,
+        });
+
+      const workoutPlansResult = await supabase
+        .from("workout_plans")
+        .select("*", {
+          count: "exact",
+          head: true,
+        });
+
+      if (membersResult.error) {
+        throw membersResult.error;
+      }
+
+      if (trainersResult.error) {
+        throw trainersResult.error;
+      }
+
+      if (schedulesResult.error) {
+        throw schedulesResult.error;
+      }
+
+      if (workoutPlansResult.error) {
+        throw workoutPlansResult.error;
+      }
+
+      setMembers(membersResult.count || 0);
+      setTrainers(trainersResult.count || 0);
+      setSchedules(
+        schedulesResult.data?.length || 0
+      );
+      setWorkoutPlans(
+        workoutPlansResult.count || 0
+      );
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const upcoming = (schedulesResult.data || [])
+        .filter((schedule) => {
+          if (!schedule.schedule_date) {
+            return false;
+          }
+
+          const scheduleDate = new Date(
+            `${schedule.schedule_date}T00:00:00`
+          );
+
+          return scheduleDate >= today;
+        })
+        .slice(0, 5);
+
+      setUpcomingSchedules(upcoming);
+    } catch (err) {
+      console.error("Dashboard error:", err);
+
+      setError(
+        err.message ||
+          "Unable to load dashboard data."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) {
+      return "-";
+    }
+
+    return new Date(
+      `${date}T00:00:00`
+    ).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="loading-box">
+          Loading dashboard...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
-
       <div className="page-header">
-
         <div>
-
-          <h1>
-            Dashboard
-          </h1>
+          <h1>Dashboard</h1>
 
           <p>
-            Overview of your fitness center.
+            Overview of your fitness management
+            system.
           </p>
-
         </div>
-
       </div>
+
+      {error && (
+        <div className="alert error-alert">
+          {error}
+        </div>
+      )}
 
       <div className="dashboard-grid">
 
-        <DashboardCard
-          title="Members"
-          value={
-            loading
-              ? "..."
-              : stats.members
-          }
-          description="Registered members"
-          icon="♙"
-        />
+        <Link
+          to="/members"
+          className="dashboard-card"
+        >
+          <div className="dashboard-card-icon">
+            👥
+          </div>
 
-        <DashboardCard
-          title="Trainers"
-          value={
-            loading
-              ? "..."
-              : stats.trainers
-          }
-          description="Available trainers"
-          icon="♟"
-        />
+          <div className="dashboard-card-content">
+            <p>Total Members</p>
+            <h2>{members}</h2>
+          </div>
 
-        <DashboardCard
-          title="Schedules"
-          value={
-            loading
-              ? "..."
-              : stats.schedules
-          }
-          description="Training schedules"
-          icon="◫"
-        />
+          <div className="dashboard-card-arrow">
+            →
+          </div>
+        </Link>
 
-        <DashboardCard
-          title="Workout Plans"
-          value={
-            loading
-              ? "..."
-              : stats.workoutPlans
-          }
-          description="Created workout plans"
-          icon="◈"
-        />
+        <Link
+          to="/trainers"
+          className="dashboard-card"
+        >
+          <div className="dashboard-card-icon">
+            🏋️
+          </div>
+
+          <div className="dashboard-card-content">
+            <p>Total Trainers</p>
+            <h2>{trainers}</h2>
+          </div>
+
+          <div className="dashboard-card-arrow">
+            →
+          </div>
+        </Link>
+
+        <Link
+          to="/schedules"
+          className="dashboard-card"
+        >
+          <div className="dashboard-card-icon">
+            📅
+          </div>
+
+          <div className="dashboard-card-content">
+            <p>Total Schedules</p>
+            <h2>{schedules}</h2>
+          </div>
+
+          <div className="dashboard-card-arrow">
+            →
+          </div>
+        </Link>
+
+        <Link
+          to="/workout-plans"
+          className="dashboard-card"
+        >
+          <div className="dashboard-card-icon">
+            💪
+          </div>
+
+          <div className="dashboard-card-content">
+            <p>Workout Plans</p>
+            <h2>{workoutPlans}</h2>
+          </div>
+
+          <div className="dashboard-card-arrow">
+            →
+          </div>
+        </Link>
 
       </div>
 
       <div className="dashboard-section">
 
         <div className="section-header">
-
           <div>
-
-            <h2>
-              Upcoming Schedules
-            </h2>
+            <h2>Upcoming Schedules</h2>
 
             <p>
-              Your next training sessions
+              Your upcoming fitness sessions.
             </p>
-
           </div>
 
+          <Link
+            to="/schedules"
+            className="secondary-button"
+          >
+            View All
+          </Link>
         </div>
 
-        {schedules.length === 0 ? (
+        {upcomingSchedules.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">
+              📅
+            </div>
 
-          <div className="empty-dashboard">
-            No upcoming schedules.
+            <h3>No upcoming schedules</h3>
+
+            <p>
+              There are no upcoming training
+              sessions.
+            </p>
           </div>
-
         ) : (
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Title</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
 
-          <div className="schedule-list">
+              <tbody>
+                {upcomingSchedules.map(
+                  (schedule) => (
+                    <tr key={schedule.id}>
+                      <td>
+                        {formatDate(
+                          schedule.schedule_date
+                        )}
+                      </td>
 
-            {schedules.map(
-              (schedule) => (
+                      <td>
+                        {schedule.title ||
+                          schedule.activity ||
+                          schedule.type ||
+                          "Training"}
+                      </td>
 
-                <div
-                  className="schedule-item"
-                  key={schedule.id}
-                >
+                      <td>
+                        {schedule.start_time || "-"}
+                      </td>
 
-                  <div className="schedule-date">
+                      <td>
+                        {schedule.end_time || "-"}
+                      </td>
 
-                    <strong>
-                      {new Date(
-                        schedule.schedule_date
-                      ).getDate()}
-                    </strong>
-
-                    <span>
-                      {new Date(
-                        schedule.schedule_date
-                      ).toLocaleDateString(
-                        "en-IN",
-                        {
-                          month: "short"
-                        }
-                      )}
-                    </span>
-
-                  </div>
-
-                  <div className="schedule-info">
-
-                    <h3>
-                      {schedule.title}
-                    </h3>
-
-                    <p>
-                      Trainer:{" "}
-                      {schedule.trainers?.name ||
-                        "Not assigned"}
-                    </p>
-
-                  </div>
-
-                  <div className="schedule-time">
-
-                    {schedule.start_time}
-                    {" - "}
-                    {schedule.end_time}
-
-                  </div>
-
-                </div>
-
-              )
-            )}
-
+                      <td>
+                        <span className="status-badge">
+                          {schedule.status ||
+                            "Scheduled"}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
           </div>
-
         )}
 
       </div>
-
     </div>
   );
 }
 
 export default Dashboard;
+

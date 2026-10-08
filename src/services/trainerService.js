@@ -1,40 +1,78 @@
 import { supabase } from "../supabase";
 
-export const getTrainers = async () => {
-  return await supabase
+export async function getTrainers() {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase
     .from("trainers")
     .select("*")
-    .order("created_at", { ascending: false });
-};
+    .order("created_at", {
+      ascending: false,
+    });
 
-export const getTrainerById = async (id) => {
-  return await supabase
-    .from("trainers")
-    .select("*")
-    .eq("id", id)
-    .single();
-};
+  if (error) {
+    throw error;
+  }
 
-export const createTrainer = async (trainer) => {
-  return await supabase
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createTrainer(trainer) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase
     .from("trainers")
     .insert([trainer])
     .select()
     .single();
-};
 
-export const updateTrainer = async (id, trainer) => {
-  return await supabase
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function addTrainer(trainer) {
+  return createTrainer(trainer);
+}
+
+export async function updateTrainer(id, trainer) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase
     .from("trainers")
     .update(trainer)
     .eq("id", id)
     .select()
     .single();
-};
 
-export const deleteTrainer = async (id) => {
-  return await supabase
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function deleteTrainer(id) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
     .from("trainers")
     .delete()
     .eq("id", id);
-};
+
+  if (error) {
+    throw error;
+  }
+
+  return true;
+}

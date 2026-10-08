@@ -1,40 +1,74 @@
 import { supabase } from "../supabase";
 
-export const getMembers = async () => {
-  return await supabase
+export async function getMembers() {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase
     .from("members")
     .select("*")
-    .order("created_at", { ascending: false });
-};
+    .order("created_at", {
+      ascending: false,
+    });
 
-export const getMemberById = async (id) => {
-  return await supabase
-    .from("members")
-    .select("*")
-    .eq("id", id)
-    .single();
-};
+  if (error) {
+    throw error;
+  }
 
-export const createMember = async (member) => {
-  return await supabase
+  return Array.isArray(data) ? data : [];
+}
+
+export async function addMember(member) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase
     .from("members")
     .insert([member])
     .select()
     .single();
-};
 
-export const updateMember = async (id, member) => {
-  return await supabase
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateMember(id, member) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase
     .from("members")
     .update(member)
     .eq("id", id)
     .select()
     .single();
-};
 
-export const deleteMember = async (id) => {
-  return await supabase
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function deleteMember(id) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
     .from("members")
     .delete()
     .eq("id", id);
-};
+
+  if (error) {
+    throw error;
+  }
+
+  return true;
+}

@@ -1,679 +1,687 @@
-import {
-  useEffect,
-  useState
-} from "react";
+import { useEffect, useState } from "react";
 
 import {
   getMembers,
   addMember,
   updateMember,
-  deleteMember
+  deleteMember,
 } from "../services/memberService";
 
 function Members() {
+  const [members, setMembers] = useState([]);
 
-  const emptyForm = {
-    name: "",
-    email: "",
-    phone: "",
-    gender: "",
-    age: "",
-    membership_type: "",
-    membership_start: "",
-    membership_end: ""
-  };
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [members, setMembers] =
-    useState([]);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
-  const [form, setForm] =
-    useState(emptyForm);
+  const [showForm, setShowForm] = useState(false);
 
   const [editingId, setEditingId] =
     useState(null);
 
-  const [search, setSearch] =
-    useState("");
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
 
-  const [loading, setLoading] =
-    useState(false);
-
-  async function loadMembers() {
-
-    try {
-
-      const data =
-        await getMembers();
-
-      setMembers(data);
-
-    } catch (error) {
-
-      alert(error.message);
-
-    }
-  }
+  /* =====================================================
+     LOAD MEMBERS
+  ===================================================== */
 
   useEffect(() => {
     loadMembers();
   }, []);
 
-  function handleChange(e) {
-
-    setForm({
-      ...form,
-      [e.target.name]:
-        e.target.value
-    });
-  }
-
-  async function handleSubmit(e) {
-
-    e.preventDefault();
-
-    if (
-      !form.name.trim() ||
-      !form.email.trim()
-    ) {
-
-      alert(
-        "Name and email are required."
-      );
-
-      return;
-    }
+  async function loadMembers() {
+    setLoading(true);
+    setError("");
 
     try {
+      const data = await getMembers();
 
-      setLoading(true);
+      setMembers(
+        Array.isArray(data) ? data : []
+      );
+    } catch (err) {
+      console.error(
+        "Error loading members:",
+        err
+      );
 
-      const member = {
+      setMembers([]);
 
-        name:
-          form.name.trim(),
-
-        email:
-          form.email.trim(),
-
-        phone:
-          form.phone.trim() || null,
-
-        gender:
-          form.gender || null,
-
-        age:
-          form.age
-            ? Number(form.age)
-            : null,
-
-        membership_type:
-          form.membership_type ||
-          null,
-
-        membership_start:
-          form.membership_start ||
-          null,
-
-        membership_end:
-          form.membership_end ||
-          null
-
-      };
-
-      if (editingId) {
-
-        await updateMember(
-          editingId,
-          member
-        );
-
-        alert(
-          "Member updated successfully."
-        );
-
-      } else {
-
-        await addMember(member);
-
-        alert(
-          "Member added successfully."
-        );
-      }
-
-      setForm(emptyForm);
-      setEditingId(null);
-
-      await loadMembers();
-
-    } catch (error) {
-
-      alert(error.message);
-
+      setError(
+        err?.message ||
+          "Unable to load members."
+      );
     } finally {
-
       setLoading(false);
-
     }
   }
 
-  function handleEdit(member) {
+  /* =====================================================
+     FORM CHANGE
+  ===================================================== */
 
+  function handleChange(event) {
+    const { name, value } =
+      event.target;
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  /* =====================================================
+     OPEN ADD FORM
+  ===================================================== */
+
+  function openAddForm() {
+    setEditingId(null);
+
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+    });
+
+    setError("");
+
+    setShowForm(true);
+  }
+
+  /* =====================================================
+     OPEN EDIT FORM
+  ===================================================== */
+
+  function openEditForm(member) {
     setEditingId(member.id);
 
     setForm({
-
-      name:
-        member.name || "",
-
-      email:
-        member.email || "",
-
-      phone:
-        member.phone || "",
-
-      gender:
-        member.gender || "",
-
-      age:
-        member.age || "",
-
-      membership_type:
-        member.membership_type || "",
-
-      membership_start:
-        member.membership_start || "",
-
-      membership_end:
-        member.membership_end || ""
-
+      name: member.name || "",
+      email: member.email || "",
+      phone: member.phone || "",
     });
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+    setError("");
+
+    setShowForm(true);
   }
 
-  async function handleDelete(id) {
+  /* =====================================================
+     CLOSE FORM
+  ===================================================== */
 
-    if (
-      !window.confirm(
-        "Delete this member?"
-      )
-    ) {
+  function closeForm() {
+    if (saving) {
       return;
     }
 
-    try {
+    setShowForm(false);
+    setEditingId(null);
 
-      await deleteMember(id);
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+    });
+
+    setError("");
+  }
+
+  /* =====================================================
+     SAVE MEMBER
+  ===================================================== */
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    setError("");
+
+    const name =
+      form.name.trim();
+
+    const email =
+      form.email.trim();
+
+    const phone =
+      form.phone.trim();
+
+    if (!name) {
+      setError(
+        "Please enter the member name."
+      );
+      return;
+    }
+
+    if (!email) {
+      setError(
+        "Please enter the member email."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const memberData = {
+        name,
+        email,
+        phone,
+      };
+
+      if (editingId) {
+        await updateMember(
+          editingId,
+          memberData
+        );
+      } else {
+        await addMember(memberData);
+      }
 
       await loadMembers();
 
-    } catch (error) {
+      closeForm();
+    } catch (err) {
+      console.error(
+        "Error saving member:",
+        err
+      );
 
-      alert(error.message);
-
+      setError(
+        err?.message ||
+          "Unable to save member."
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
-  function cancelEdit() {
+  /* =====================================================
+     DELETE MEMBER
+  ===================================================== */
 
-    setEditingId(null);
-    setForm(emptyForm);
+  async function handleDelete(id) {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this member?"
+      );
 
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      await deleteMember(id);
+
+      setMembers((current) =>
+        current.filter(
+          (member) =>
+            member.id !== id
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error deleting member:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to delete member."
+      );
+    }
   }
 
+  /* =====================================================
+     SEARCH
+  ===================================================== */
+
+  const searchText =
+    search.trim().toLowerCase();
+
   const filteredMembers =
-    members.filter(
-      (member) => {
+    Array.isArray(members)
+      ? members.filter((member) => {
+          const name =
+            String(
+              member.name || ""
+            ).toLowerCase();
 
-        const value =
-          search
-            .toLowerCase()
-            .trim();
+          const email =
+            String(
+              member.email || ""
+            ).toLowerCase();
 
-        if (!value) {
-          return true;
-        }
+          const phone =
+            String(
+              member.phone || ""
+            ).toLowerCase();
 
-        return (
-          member.name
-            ?.toLowerCase()
-            .includes(value) ||
+          return (
+            name.includes(searchText) ||
+            email.includes(searchText) ||
+            phone.includes(searchText)
+          );
+        })
+      : [];
 
-          member.email
-            ?.toLowerCase()
-            .includes(value) ||
+  /* =====================================================
+     FORMAT DATE
+  ===================================================== */
 
-          member.phone
-            ?.toLowerCase()
-            .includes(value) ||
+  function formatDate(date) {
+    if (!date) {
+      return "-";
+    }
 
-          member.membership_type
-            ?.toLowerCase()
-            .includes(value)
-        );
+    const parsedDate =
+      new Date(date);
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return date;
+    }
+
+    return parsedDate.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       }
     );
+  }
+
+  /* =====================================================
+     PAGE
+  ===================================================== */
 
   return (
     <div className="page">
 
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
       <div className="page-header">
 
         <div>
-
-          <h1>
-            Members
-          </h1>
+          <h1>Members</h1>
 
           <p>
-            Manage fitness center members.
+            Manage your fitness center
+            members.
           </p>
-
         </div>
 
-        <span className="record-count">
-          {members.length} Members
-        </span>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={openAddForm}
+        >
+          + Add Member
+        </button>
 
       </div>
 
-      <div className="form-card">
 
-        <h2>
-          {editingId
-            ? "Edit Member"
-            : "Add New Member"}
-        </h2>
+      {/* =================================================
+          ERROR
+      ================================================= */}
 
-        <form
-          className="management-form"
-          onSubmit={handleSubmit}
-        >
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
 
-          <div className="input-group">
 
-            <label>
-              Full Name *
-            </label>
+      {/* =================================================
+          SEARCH
+      ================================================= */}
 
-            <input
-              name="name"
-              placeholder="Full name"
-              value={form.name}
-              onChange={handleChange}
-            />
+      <div className="content-card">
 
-          </div>
+        <div className="search-row">
 
-          <div className="input-group">
+          <input
+            type="text"
+            value={search}
+            onChange={(event) =>
+              setSearch(
+                event.target.value
+              )
+            }
+            placeholder="Search members by name, email or phone..."
+            className="search-input"
+          />
 
-            <label>
-              Email *
-            </label>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={loadMembers}
+            disabled={loading}
+          >
+            {loading
+              ? "Loading..."
+              : "Refresh"}
+          </button>
 
-            <input
-              name="email"
-              type="email"
-              placeholder="Email"
-              value={form.email}
-              onChange={handleChange}
-            />
+        </div>
 
-          </div>
+      </div>
 
-          <div className="input-group">
 
-            <label>
-              Phone
-            </label>
+      {/* =================================================
+          MEMBER FORM
+      ================================================= */}
 
-            <input
-              name="phone"
-              placeholder="Phone number"
-              value={form.phone}
-              onChange={handleChange}
-            />
+      {showForm && (
+        <div className="content-card">
 
-          </div>
+          <div className="section-header">
 
-          <div className="input-group">
+            <div>
+              <h2>
+                {editingId
+                  ? "Edit Member"
+                  : "Add Member"}
+              </h2>
 
-            <label>
-              Gender
-            </label>
-
-            <select
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-            >
-
-              <option value="">
-                Select gender
-              </option>
-
-              <option value="Male">
-                Male
-              </option>
-
-              <option value="Female">
-                Female
-              </option>
-
-              <option value="Other">
-                Other
-              </option>
-
-            </select>
+              <p>
+                Enter the member
+                information below.
+              </p>
+            </div>
 
           </div>
 
-          <div className="input-group">
 
-            <label>
-              Age
-            </label>
+          <form
+            onSubmit={handleSubmit}
+            className="form-grid"
+          >
 
-            <input
-              name="age"
-              type="number"
-              min="1"
-              placeholder="Age"
-              value={form.age}
-              onChange={handleChange}
-            />
+            <div className="form-group">
 
-          </div>
+              <label htmlFor="member-name">
+                Name
+              </label>
 
-          <div className="input-group">
+              <input
+                id="member-name"
+                name="name"
+                type="text"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Enter member name"
+                required
+              />
 
-            <label>
-              Membership
-            </label>
+            </div>
 
-            <select
-              name="membership_type"
-              value={
-                form.membership_type
-              }
-              onChange={handleChange}
-            >
 
-              <option value="">
-                Select membership
-              </option>
+            <div className="form-group">
 
-              <option value="Monthly">
-                Monthly
-              </option>
+              <label htmlFor="member-email">
+                Email
+              </label>
 
-              <option value="Quarterly">
-                Quarterly
-              </option>
+              <input
+                id="member-email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Enter email address"
+                required
+              />
 
-              <option value="Half Yearly">
-                Half Yearly
-              </option>
+            </div>
 
-              <option value="Yearly">
-                Yearly
-              </option>
 
-            </select>
+            <div className="form-group">
 
-          </div>
+              <label htmlFor="member-phone">
+                Phone
+              </label>
 
-          <div className="input-group">
+              <input
+                id="member-phone"
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="Enter phone number"
+              />
 
-            <label>
-              Membership Start
-            </label>
+            </div>
 
-            <input
-              name="membership_start"
-              type="date"
-              value={
-                form.membership_start
-              }
-              onChange={handleChange}
-            />
 
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Membership End
-            </label>
-
-            <input
-              name="membership_end"
-              type="date"
-              value={
-                form.membership_end
-              }
-              onChange={handleChange}
-            />
-
-          </div>
-
-          <div className="form-buttons">
-
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={loading}
-            >
-              {loading
-                ? "Saving..."
-                : editingId
-                ? "Update Member"
-                : "Add Member"}
-            </button>
-
-            {editingId && (
+            <div className="form-actions">
 
               <button
                 type="button"
                 className="secondary-button"
-                onClick={cancelEdit}
+                onClick={closeForm}
+                disabled={saving}
               >
                 Cancel
               </button>
 
-            )}
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={saving}
+              >
+                {saving
+                  ? "Saving..."
+                  : editingId
+                  ? "Update Member"
+                  : "Add Member"}
+              </button>
 
-          </div>
+            </div>
 
-        </form>
+          </form>
 
-      </div>
+        </div>
+      )}
 
-      <div className="table-card">
 
-        <div className="table-header">
+      {/* =================================================
+          MEMBERS TABLE
+      ================================================= */}
+
+      <div className="content-card">
+
+        <div className="section-header">
 
           <div>
-
             <h2>
-              Member List
+              All Members
             </h2>
 
             <p>
-              All registered members.
+              {filteredMembers.length}{" "}
+              member
+              {filteredMembers.length !==
+              1
+                ? "s"
+                : ""}
             </p>
-
           </div>
 
-          <input
-            className="search-input"
-            placeholder="Search members..."
-            value={search}
-            onChange={(e) =>
-              setSearch(
-                e.target.value
-              )
-            }
-          />
-
         </div>
 
-        <div className="table-container">
 
-          <table>
+        {loading ? (
+          <div className="empty-state">
+            <div className="loading-spinner">
+              Loading members...
+            </div>
+          </div>
+        ) : filteredMembers.length ===
+          0 ? (
+          <div className="empty-state">
 
-            <thead>
-
-              <tr>
-
-                <th>
-                  Member
-                </th>
-
-                <th>
-                  Contact
-                </th>
-
-                <th>
-                  Membership
-                </th>
-
-                <th>
-                  Start
-                </th>
-
-                <th>
-                  End
-                </th>
-
-                <th>
-                  Actions
-                </th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {filteredMembers.map(
-                (member) => (
-
-                  <tr
-                    key={member.id}
-                  >
-
-                    <td>
-
-                      <div className="person-cell">
-
-                        <div className="person-avatar">
-                          {member.name
-                            ?.charAt(0)
-                            .toUpperCase()}
-                        </div>
-
-                        <div>
-
-                          <strong>
-                            {member.name}
-                          </strong>
-
-                          <small>
-                            {member.age
-                              ? `${member.age} years`
-                              : ""}
-                          </small>
-
-                        </div>
-
-                      </div>
-
-                    </td>
-
-                    <td>
-
-                      <div className="contact-cell">
-
-                        <span>
-                          {member.email}
-                        </span>
-
-                        <small>
-                          {member.phone ||
-                            "No phone"}
-                        </small>
-
-                      </div>
-
-                    </td>
-
-                    <td>
-
-                      <span className="status-badge">
-                        {member.membership_type ||
-                          "Not Set"}
-                      </span>
-
-                    </td>
-
-                    <td>
-                      {member.membership_start ||
-                        "—"}
-                    </td>
-
-                    <td>
-                      {member.membership_end ||
-                        "—"}
-                    </td>
-
-                    <td>
-
-                      <button
-                        className="small-button"
-                        onClick={() =>
-                          handleEdit(
-                            member
-                          )
-                        }
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="small-button delete-button"
-                        onClick={() =>
-                          handleDelete(
-                            member.id
-                          )
-                        }
-                      >
-                        Delete
-                      </button>
-
-                    </td>
-
-                  </tr>
-
-                )
-              )}
-
-            </tbody>
-
-          </table>
-
-          {filteredMembers.length === 0 && (
-
-            <div className="empty-message">
-              No members found.
+            <div className="empty-icon">
+              👥
             </div>
 
-          )}
+            <h3>
+              {search
+                ? "No members found"
+                : "No members yet"}
+            </h3>
 
-        </div>
+            <p>
+              {search
+                ? "Try a different search."
+                : "Add your first member to get started."}
+            </p>
+
+            {!search && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={openAddForm}
+              >
+                + Add Member
+              </button>
+            )}
+
+          </div>
+        ) : (
+          <div className="table-container">
+
+            <table className="data-table">
+
+              <thead>
+                <tr>
+
+                  <th>
+                    Name
+                  </th>
+
+                  <th>
+                    Email
+                  </th>
+
+                  <th>
+                    Phone
+                  </th>
+
+                  <th>
+                    Joined
+                  </th>
+
+                  <th>
+                    Actions
+                  </th>
+
+                </tr>
+              </thead>
+
+
+              <tbody>
+
+                {filteredMembers.map(
+                  (member) => (
+                    <tr
+                      key={member.id}
+                    >
+
+                      <td>
+                        <div className="member-name">
+                          <span className="member-avatar">
+                            {(
+                              member.name ||
+                              "M"
+                            )
+                              .charAt(0)
+                              .toUpperCase()}
+                          </span>
+
+                          <strong>
+                            {member.name ||
+                              "-"}
+                          </strong>
+                        </div>
+                      </td>
+
+
+                      <td>
+                        {member.email ||
+                          "-"}
+                      </td>
+
+
+                      <td>
+                        {member.phone ||
+                          "-"}
+                      </td>
+
+
+                      <td>
+                        {formatDate(
+                          member.created_at
+                        )}
+                      </td>
+
+
+                      <td>
+
+                        <div className="table-actions">
+
+                          <button
+                            type="button"
+                            className="edit-button"
+                            onClick={() =>
+                              openEditForm(
+                                member
+                              )
+                            }
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            className="delete-button"
+                            onClick={() =>
+                              handleDelete(
+                                member.id
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
+
+                        </div>
+
+                      </td>
+
+                    </tr>
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+        )}
 
       </div>
 

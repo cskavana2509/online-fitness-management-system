@@ -1,37 +1,21 @@
-function DashboardCard({
-  title,
-  value,
-  description,
-  icon
-}) {
+import { Link } from "react-router-dom";
+
+function DashboardCard({ title, value, icon, link }) {
   return (
-    <div className="dashboard-card">
-
-      <div className="dashboard-card-header">
-
-        <div>
-
-          <p className="card-title">
-            {title}
-          </p>
-
-          <h2 className="card-value">
-            {value}
-          </h2>
-
-        </div>
-
-        <div className="card-icon">
-          {icon}
-        </div>
-
+    <Link to={link} className="dashboard-card">
+      <div className="dashboard-card-icon">
+        {icon}
       </div>
 
-      <p className="card-description">
-        {description}
-      </p>
+      <div className="dashboard-card-content">
+        <p>{title}</p>
+        <h2>{value}</h2>
+      </div>
 
-    </div>
+      <div className="dashboard-card-arrow">
+        →
+      </div>
+    </Link>
   );
 }
 

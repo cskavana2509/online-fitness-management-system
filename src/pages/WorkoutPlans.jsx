@@ -1,986 +1,949 @@
-import {
-  useEffect,
-  useState
-} from "react";
+import { useEffect, useState } from "react";
 
 import {
   getWorkoutPlans,
-  addWorkoutPlan,
+  createWorkoutPlan,
   updateWorkoutPlan,
   deleteWorkoutPlan,
-  addExercise,
-  updateExercise,
-  deleteExercise
+  getWorkoutExercises,
+  createWorkoutExercise,
+  updateWorkoutExercise,
+  deleteWorkoutExercise,
 } from "../services/workoutService";
 
-import {
-  getMembers
-} from "../services/memberService";
-
-import {
-  getTrainers
-} from "../services/trainerService";
+import { getMembers } from "../services/memberService";
+import { getTrainers } from "../services/trainerService";
 
 function WorkoutPlans() {
+  const [plans, setPlans] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [trainers, setTrainers] = useState([]);
 
-  const emptyPlan = {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [error, setError] = useState("");
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const [expandedPlan, setExpandedPlan] = useState(null);
+
+  const [form, setForm] = useState({
+    plan_name: "",
     member_id: "",
     trainer_id: "",
-    plan_name: "",
     goal: "",
-    duration_weeks: ""
-  };
+    duration_weeks: "",
+  });
 
-  const emptyExercise = {
+  const [exerciseForm, setExerciseForm] = useState({
     exercise_name: "",
     sets: "",
     reps: "",
     duration_minutes: "",
-    notes: ""
-  };
+    notes: "",
+  });
 
-  const [plans, setPlans] =
-    useState([]);
+  const [exercises, setExercises] = useState({});
+  const [editingExerciseId, setEditingExerciseId] = useState(null);
 
-  const [members, setMembers] =
-    useState([]);
-
-  const [trainers, setTrainers] =
-    useState([]);
-
-  const [planForm, setPlanForm] =
-    useState(emptyPlan);
-
-  const [exerciseForm, setExerciseForm] =
-    useState(emptyExercise);
-
-  const [editingPlanId, setEditingPlanId] =
-    useState(null);
-
-  const [selectedPlanId, setSelectedPlanId] =
-    useState(null);
-
-  const [editingExerciseId, setEditingExerciseId] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  async function loadData() {
-
-    try {
-
-      const [
-        planData,
-        memberData,
-        trainerData
-      ] = await Promise.all([
-        getWorkoutPlans(),
-        getMembers(),
-        getTrainers()
-      ]);
-
-      setPlans(planData);
-      setMembers(memberData);
-      setTrainers(trainerData);
-
-    } catch (error) {
-
-      alert(error.message);
-
-    }
-  }
+  /* =========================================================
+     LOAD DATA
+     ========================================================= */
 
   useEffect(() => {
-    loadData();
+    loadEverything();
   }, []);
 
-  function handlePlanChange(e) {
-
-    setPlanForm({
-      ...planForm,
-      [e.target.name]:
-        e.target.value
-    });
-  }
-
-  function handleExerciseChange(e) {
-
-    setExerciseForm({
-      ...exerciseForm,
-      [e.target.name]:
-        e.target.value
-    });
-  }
-
-  async function handlePlanSubmit(e) {
-
-    e.preventDefault();
-
-    if (
-      !planForm.plan_name.trim() ||
-      !planForm.goal.trim()
-    ) {
-
-      alert(
-        "Plan name and goal are required."
-      );
-
-      return;
-    }
-
+  async function loadEverything() {
     try {
-
       setLoading(true);
+      setError("");
 
-      const plan = {
+      const [plansData, membersData, trainersData] = await Promise.all([
+        getWorkoutPlans(),
+        getMembers(),
+        getTrainers(),
+      ]);
 
-        member_id:
-          planForm.member_id
-            ? Number(
-                planForm.member_id
-              )
-            : null,
-
-        trainer_id:
-          planForm.trainer_id
-            ? Number(
-                planForm.trainer_id
-              )
-            : null,
-
-        plan_name:
-          planForm.plan_name.trim(),
-
-        goal:
-          planForm.goal.trim(),
-
-        duration_weeks:
-          planForm.duration_weeks
-            ? Number(
-                planForm.duration_weeks
-              )
-            : null
-
-      };
-
-      if (editingPlanId) {
-
-        await updateWorkoutPlan(
-          editingPlanId,
-          plan
-        );
-
-        alert(
-          "Workout plan updated successfully."
-        );
-
-      } else {
-
-        await addWorkoutPlan(
-          plan
-        );
-
-        alert(
-          "Workout plan created successfully."
-        );
-      }
-
-      setPlanForm(emptyPlan);
-      setEditingPlanId(null);
-
-      await loadData();
-
-    } catch (error) {
-
-      alert(error.message);
-
+      setPlans(Array.isArray(plansData) ? plansData : []);
+      setMembers(Array.isArray(membersData) ? membersData : []);
+      setTrainers(Array.isArray(trainersData) ? trainersData : []);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.message || "Unable to load workout plans."
+      );
     } finally {
-
       setLoading(false);
-
     }
   }
 
-  function editPlan(plan) {
+  /* =========================================================
+     FORM
+     ========================================================= */
 
-    setEditingPlanId(plan.id);
+  function openCreateForm() {
+    setEditingId(null);
 
-    setPlanForm({
+    setForm({
+      plan_name: "",
+      member_id: "",
+      trainer_id: "",
+      goal: "",
+      duration_weeks: "",
+    });
 
-      member_id:
-        plan.member_id || "",
+    setError("");
+    setShowForm(true);
+  }
 
-      trainer_id:
-        plan.trainer_id || "",
+  function openEditForm(plan) {
+    setEditingId(plan.id);
 
-      plan_name:
-        plan.plan_name || "",
-
-      goal:
-        plan.goal || "",
-
+    setForm({
+      plan_name: plan.plan_name || "",
+      member_id: plan.member_id ? String(plan.member_id) : "",
+      trainer_id: plan.trainer_id ? String(plan.trainer_id) : "",
+      goal: plan.goal || "",
       duration_weeks:
-        plan.duration_weeks || ""
-
+        plan.duration_weeks !== null &&
+        plan.duration_weeks !== undefined
+          ? String(plan.duration_weeks)
+          : "",
     });
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
+    setError("");
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+
+    setForm({
+      plan_name: "",
+      member_id: "",
+      trainer_id: "",
+      goal: "",
+      duration_weeks: "",
     });
   }
 
-  async function handleDeletePlan(id) {
+  function handleChange(event) {
+    const { name, value } = event.target;
 
-    if (
-      !window.confirm(
-        "Delete this workout plan? All exercises belonging to this plan will also be deleted."
-      )
-    ) {
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    if (!form.plan_name.trim()) {
+      setError("Please enter a workout plan name.");
       return;
     }
 
     try {
+      setSaving(true);
+      setError("");
 
-      await deleteWorkoutPlan(id);
-
-      if (selectedPlanId === id) {
-        setSelectedPlanId(null);
-      }
-
-      await loadData();
-
-    } catch (error) {
-
-      alert(error.message);
-
-    }
-  }
-
-  function cancelPlanEdit() {
-
-    setEditingPlanId(null);
-    setPlanForm(emptyPlan);
-
-  }
-
-  function openExercises(planId) {
-
-    if (
-      selectedPlanId === planId
-    ) {
-
-      setSelectedPlanId(null);
-
-      setEditingExerciseId(null);
-
-      setExerciseForm(
-        emptyExercise
-      );
-
-    } else {
-
-      setSelectedPlanId(planId);
-
-      setEditingExerciseId(null);
-
-      setExerciseForm(
-        emptyExercise
-      );
-
-    }
-  }
-
-  async function handleExerciseSubmit(e) {
-
-    e.preventDefault();
-
-    if (!selectedPlanId) {
-
-      alert(
-        "Please select a workout plan."
-      );
-
-      return;
-    }
-
-    if (
-      !exerciseForm.exercise_name.trim()
-    ) {
-
-      alert(
-        "Exercise name is required."
-      );
-
-      return;
-    }
-
-    try {
-
-      const exercise = {
-
-        workout_plan_id:
-          selectedPlanId,
-
-        exercise_name:
-          exerciseForm.exercise_name.trim(),
-
-        sets:
-          exerciseForm.sets
-            ? Number(
-                exerciseForm.sets
-              )
-            : null,
-
-        reps:
-          exerciseForm.reps
-            ? Number(
-                exerciseForm.reps
-              )
-            : null,
-
-        duration_minutes:
-          exerciseForm.duration_minutes
-            ? Number(
-                exerciseForm.duration_minutes
-              )
-            : null,
-
-        notes:
-          exerciseForm.notes.trim() ||
-          null
-
+      const payload = {
+        plan_name: form.plan_name.trim(),
+        member_id: form.member_id || null,
+        trainer_id: form.trainer_id || null,
+        goal: form.goal.trim() || null,
+        duration_weeks: form.duration_weeks || null,
       };
 
-      if (editingExerciseId) {
-
-        await updateExercise(
-          editingExerciseId,
-          exercise
-        );
-
+      if (editingId) {
+        await updateWorkoutPlan(editingId, payload);
       } else {
-
-        await addExercise(
-          exercise
-        );
-
+        await createWorkoutPlan(payload);
       }
 
-      setExerciseForm(
-        emptyExercise
+      closeForm();
+      await loadEverything();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.message || "Unable to save workout plan."
       );
-
-      setEditingExerciseId(null);
-
-      await loadData();
-
-    } catch (error) {
-
-      alert(error.message);
-
+    } finally {
+      setSaving(false);
     }
   }
 
-  function editExercise(
-    exercise
-  ) {
+  /* =========================================================
+     DELETE PLAN
+     ========================================================= */
 
-    setEditingExerciseId(
-      exercise.id
+  async function handleDelete(plan) {
+    const confirmed = window.confirm(
+      `Delete workout plan "${plan.plan_name}"?`
     );
 
-    setExerciseForm({
+    if (!confirmed) return;
 
-      exercise_name:
-        exercise.exercise_name ||
-        "",
+    try {
+      setError("");
 
-      sets:
-        exercise.sets || "",
+      await deleteWorkoutPlan(plan.id);
 
-      reps:
-        exercise.reps || "",
+      if (expandedPlan === plan.id) {
+        setExpandedPlan(null);
+      }
 
-      duration_minutes:
-        exercise.duration_minutes ||
-        "",
+      await loadEverything();
+    } catch (err) {
+      console.error(err);
 
-      notes:
-        exercise.notes || ""
-
-    });
+      setError(
+        err?.message || "Unable to delete workout plan."
+      );
+    }
   }
 
-  async function handleDeleteExercise(
-    id
-  ) {
+  /* =========================================================
+     EXERCISES
+     ========================================================= */
 
-    if (
-      !window.confirm(
-        "Delete this exercise?"
-      )
-    ) {
+  async function toggleExercises(planId) {
+    if (expandedPlan === planId) {
+      setExpandedPlan(null);
       return;
     }
 
     try {
+      setError("");
 
-      await deleteExercise(id);
+      const data = await getWorkoutExercises(planId);
 
-      await loadData();
+      setExercises((previous) => ({
+        ...previous,
+        [planId]: Array.isArray(data) ? data : [],
+      }));
 
-    } catch (error) {
+      setExpandedPlan(planId);
+    } catch (err) {
+      console.error(err);
 
-      alert(error.message);
-
+      setError(
+        err?.message || "Unable to load exercises."
+      );
     }
   }
 
-  function cancelExerciseEdit() {
+  function handleExerciseChange(event) {
+    const { name, value } = event.target;
+
+    setExerciseForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  }
+
+  function resetExerciseForm() {
+    setExerciseForm({
+      exercise_name: "",
+      sets: "",
+      reps: "",
+      duration_minutes: "",
+      notes: "",
+    });
 
     setEditingExerciseId(null);
+  }
 
-    setExerciseForm(
-      emptyExercise
+  function startEditExercise(exercise) {
+    setEditingExerciseId(exercise.id);
+
+    setExerciseForm({
+      exercise_name: exercise.exercise_name || "",
+      sets:
+        exercise.sets !== null &&
+        exercise.sets !== undefined
+          ? String(exercise.sets)
+          : "",
+      reps:
+        exercise.reps !== null &&
+        exercise.reps !== undefined
+          ? String(exercise.reps)
+          : "",
+      duration_minutes:
+        exercise.duration_minutes !== null &&
+        exercise.duration_minutes !== undefined
+          ? String(exercise.duration_minutes)
+          : "",
+      notes: exercise.notes || "",
+    });
+  }
+
+  async function saveExercise(planId) {
+    if (!exerciseForm.exercise_name.trim()) {
+      setError("Please enter an exercise name.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      if (editingExerciseId) {
+        await updateWorkoutExercise(
+          editingExerciseId,
+          exerciseForm
+        );
+      } else {
+        await createWorkoutExercise({
+          ...exerciseForm,
+          workout_plan_id: planId,
+        });
+      }
+
+      const refreshedExercises =
+        await getWorkoutExercises(planId);
+
+      setExercises((previous) => ({
+        ...previous,
+        [planId]: refreshedExercises,
+      }));
+
+      resetExerciseForm();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err?.message || "Unable to save exercise."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeExercise(exercise, planId) {
+    const confirmed = window.confirm(
+      `Delete "${exercise.exercise_name}"?`
     );
 
+    if (!confirmed) return;
+
+    try {
+      setError("");
+
+      await deleteWorkoutExercise(exercise.id);
+
+      const refreshedExercises =
+        await getWorkoutExercises(planId);
+
+      setExercises((previous) => ({
+        ...previous,
+        [planId]: refreshedExercises,
+      }));
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err?.message || "Unable to delete exercise."
+      );
+    }
   }
+
+  /* =========================================================
+     HELPERS
+     ========================================================= */
+
+  function getMemberName(memberId, plan) {
+    if (plan?.members?.name) {
+      return plan.members.name;
+    }
+
+    const member = members.find(
+      (item) => String(item.id) === String(memberId)
+    );
+
+    return member?.name || "Not assigned";
+  }
+
+  function getTrainerName(trainerId, plan) {
+    if (plan?.trainers?.name) {
+      return plan.trainers.name;
+    }
+
+    const trainer = trainers.find(
+      (item) => String(item.id) === String(trainerId)
+    );
+
+    return trainer?.name || "Not assigned";
+  }
+
+  /* =========================================================
+     LOADING
+     ========================================================= */
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <div>
+            <h1>Workout Plans</h1>
+            <p>Manage workout plans for your members.</p>
+          </div>
+        </div>
+
+        <div className="loading-card">
+          <div className="spinner"></div>
+          <p>Loading workout plans...</p>
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================================================
+     UI
+     ========================================================= */
 
   return (
     <div className="page">
+      {/* HEADER */}
 
       <div className="page-header">
-
         <div>
-
-          <h1>
-            Workout Plans
-          </h1>
+          <h1>Workout Plans</h1>
 
           <p>
-            Create personalized workout programs.
+            Create and manage personalized workout plans.
           </p>
-
         </div>
 
-        <span className="record-count">
-          {plans.length} Plans
-        </span>
-
+        <button
+          className="primary-btn"
+          onClick={openCreateForm}
+        >
+          + Create Workout Plan
+        </button>
       </div>
 
-      <div className="form-card">
+      {/* ERROR */}
 
-        <h2>
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
 
-          {editingPlanId
-            ? "Edit Workout Plan"
-            : "Create Workout Plan"}
+      {/* FORM */}
 
-        </h2>
+      {showForm && (
+        <div className="form-card">
+          <div className="form-card-header">
+            <div>
+              <h2>
+                {editingId
+                  ? "Edit Workout Plan"
+                  : "Create Workout Plan"}
+              </h2>
 
-        <form
-          className="management-form"
-          onSubmit={handlePlanSubmit}
-        >
-
-          <div className="input-group">
-
-            <label>
-              Member
-            </label>
-
-            <select
-              name="member_id"
-              value={
-                planForm.member_id
-              }
-              onChange={
-                handlePlanChange
-              }
-            >
-
-              <option value="">
-                Select member
-              </option>
-
-              {members.map(
-                (member) => (
-
-                  <option
-                    key={member.id}
-                    value={member.id}
-                  >
-                    {member.name}
-                  </option>
-
-                )
-              )}
-
-            </select>
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Trainer
-            </label>
-
-            <select
-              name="trainer_id"
-              value={
-                planForm.trainer_id
-              }
-              onChange={
-                handlePlanChange
-              }
-            >
-
-              <option value="">
-                Select trainer
-              </option>
-
-              {trainers.map(
-                (trainer) => (
-
-                  <option
-                    key={trainer.id}
-                    value={trainer.id}
-                  >
-                    {trainer.name}
-                  </option>
-
-                )
-              )}
-
-            </select>
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Plan Name *
-            </label>
-
-            <input
-              name="plan_name"
-              placeholder="Weight Loss Program"
-              value={
-                planForm.plan_name
-              }
-              onChange={
-                handlePlanChange
-              }
-            />
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Goal *
-            </label>
-
-            <input
-              name="goal"
-              placeholder="Fat Loss"
-              value={
-                planForm.goal
-              }
-              onChange={
-                handlePlanChange
-              }
-            />
-
-          </div>
-
-          <div className="input-group">
-
-            <label>
-              Duration
-            </label>
-
-            <input
-              name="duration_weeks"
-              type="number"
-              min="1"
-              placeholder="Weeks"
-              value={
-                planForm.duration_weeks
-              }
-              onChange={
-                handlePlanChange
-              }
-            />
-
-          </div>
-
-          <div className="form-buttons">
+              <p>
+                Assign the plan to a member and trainer.
+              </p>
+            </div>
 
             <button
-              type="submit"
-              className="primary-button"
-              disabled={loading}
+              className="close-btn"
+              onClick={closeForm}
+              type="button"
             >
-              {loading
-                ? "Saving..."
-                : editingPlanId
-                ? "Update Plan"
-                : "Create Plan"}
+              ×
             </button>
+          </div>
 
-            {editingPlanId && (
+          <form onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <div className="form-group full-width">
+                <label>Plan Name *</label>
 
+                <input
+                  type="text"
+                  name="plan_name"
+                  value={form.plan_name}
+                  onChange={handleChange}
+                  placeholder="Example: Weight Loss Program"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Member</label>
+
+                <select
+                  name="member_id"
+                  value={form.member_id}
+                  onChange={handleChange}
+                >
+                  <option value="">
+                    Select Member
+                  </option>
+
+                  {members.map((member) => (
+                    <option
+                      key={member.id}
+                      value={member.id}
+                    >
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Trainer</label>
+
+                <select
+                  name="trainer_id"
+                  value={form.trainer_id}
+                  onChange={handleChange}
+                >
+                  <option value="">
+                    Select Trainer
+                  </option>
+
+                  {trainers.map((trainer) => (
+                    <option
+                      key={trainer.id}
+                      value={trainer.id}
+                    >
+                      {trainer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Goal</label>
+
+                <input
+                  type="text"
+                  name="goal"
+                  value={form.goal}
+                  onChange={handleChange}
+                  placeholder="Weight loss, muscle gain..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Duration (Weeks)</label>
+
+                <input
+                  type="number"
+                  min="1"
+                  name="duration_weeks"
+                  value={form.duration_weeks}
+                  onChange={handleChange}
+                  placeholder="12"
+                />
+              </div>
+            </div>
+
+            <div className="form-actions">
               <button
                 type="button"
-                className="secondary-button"
-                onClick={
-                  cancelPlanEdit
-                }
+                className="secondary-btn"
+                onClick={closeForm}
               >
                 Cancel
               </button>
 
-            )}
-
-          </div>
-
-        </form>
-
-      </div>
-
-      <div className="plans-container">
-
-        {plans.map(
-          (plan) => (
-
-            <div
-              className="plan-card"
-              key={plan.id}
-            >
-
-              <div className="plan-header">
-
-                <div>
-
-                  <h2>
-                    {plan.plan_name}
-                  </h2>
-
-                  <p>
-                    {plan.goal}
-                  </p>
-
-                </div>
-
-                <span className="duration-badge">
-
-                  {plan.duration_weeks
-                    ? `${plan.duration_weeks} weeks`
-                    : "No duration"}
-
-                </span>
-
-              </div>
-
-              <div className="plan-meta">
-
-                <div>
-
-                  <span>
-                    Member
-                  </span>
-
-                  <strong>
-                    {plan.members?.name ||
-                      "Not assigned"}
-                  </strong>
-
-                </div>
-
-                <div>
-
-                  <span>
-                    Trainer
-                  </span>
-
-                  <strong>
-                    {plan.trainers?.name ||
-                      "Not assigned"}
-                  </strong>
-
-                </div>
-
-              </div>
-
-              <div className="plan-actions">
-
-                <button
-                  className="small-button"
-                  onClick={() =>
-                    editPlan(plan)
-                  }
-                >
-                  Edit
-                </button>
-
-                <button
-                  className="small-button delete-button"
-                  onClick={() =>
-                    handleDeletePlan(
-                      plan.id
-                    )
-                  }
-                >
-                  Delete
-                </button>
-
-                <button
-                  className="small-button exercise-button"
-                  onClick={() =>
-                    openExercises(
-                      plan.id
-                    )
-                  }
-                >
-                  {selectedPlanId === plan.id
-                    ? "Hide Exercises"
-                    : "Exercises"}
-                </button>
-
-              </div>
-
-              {selectedPlanId ===
-                plan.id && (
-
-                <div className="exercise-section">
-
-                  <h3>
-                    Workout Exercises
-                  </h3>
-
-                  <form
-                    className="exercise-form"
-                    onSubmit={
-                      handleExerciseSubmit
-                    }
-                  >
-
-                    <input
-                      name="exercise_name"
-                      placeholder="Exercise name"
-                      value={
-                        exerciseForm.exercise_name
-                      }
-                      onChange={
-                        handleExerciseChange
-                      }
-                    />
-
-                    <input
-                      name="sets"
-                      type="number"
-                      min="1"
-                      placeholder="Sets"
-                      value={
-                        exerciseForm.sets
-                      }
-                      onChange={
-                        handleExerciseChange
-                      }
-                    />
-
-                    <input
-                      name="reps"
-                      type="number"
-                      min="1"
-                      placeholder="Reps"
-                      value={
-                        exerciseForm.reps
-                      }
-                      onChange={
-                        handleExerciseChange
-                      }
-                    />
-
-                    <input
-                      name="duration_minutes"
-                      type="number"
-                      min="1"
-                      placeholder="Minutes"
-                      value={
-                        exerciseForm.duration_minutes
-                      }
-                      onChange={
-                        handleExerciseChange
-                      }
-                    />
-
-                    <input
-                      name="notes"
-                      placeholder="Notes"
-                      value={
-                        exerciseForm.notes
-                      }
-                      onChange={
-                        handleExerciseChange
-                      }
-                    />
-
-                    <div className="exercise-buttons">
-
-                      <button
-                        type="submit"
-                        className="primary-button"
-                      >
-                        {editingExerciseId
-                          ? "Update Exercise"
-                          : "Add Exercise"}
-                      </button>
-
-                      {editingExerciseId && (
-
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={
-                            cancelExerciseEdit
-                          }
-                        >
-                          Cancel
-                        </button>
-
-                      )}
-
-                    </div>
-
-                  </form>
-
-                  <div className="exercise-list">
-
-                    {plan.workout_exercises
-                      ?.length > 0 ? (
-
-                      plan.workout_exercises.map(
-                        (exercise) => (
-
-                          <div
-                            className="exercise-item"
-                            key={
-                              exercise.id
-                            }
-                          >
-
-                            <div className="exercise-info">
-
-                              <strong>
-                                {
-                                  exercise.exercise_name
-                                }
-                              </strong>
-
-                              <div className="exercise-stats">
-
-                                {exercise.sets && (
-                                  <span>
-                                    {exercise.sets}
-                                    {" "}
-                                    sets
-                                  </span>
-                                )}
-
-                                {exercise.reps && (
-                                  <span>
-                                    {exercise.reps}
-                                    {" "}
-                                    reps
-                                  </span>
-                                )}
-
-                                {exercise.duration_minutes && (
-                                  <span>
-                                    {
-                                      exercise.duration_minutes
-                                    }
-                                    {" "}
-                                    min
-                                  </span>
-                                )}
-
-                              </div>
-
-                              {exercise.notes && (
-                                <small>
-                                  {exercise.notes}
-                                </small>
-                              )}
-
-                            </div>
-
-                            <div>
-
-                              <button
-                                className="small-button"
-                                onClick={() =>
-                                  editExercise(
-                                    exercise
-                                  )
-                                }
-                              >
-                                Edit
-                              </button>
-
-                              <button
-                                className="small-button delete-button"
-                                onClick={() =>
-                                  handleDeleteExercise(
-                                    exercise.id
-                                  )
-                                }
-                              >
-                                Delete
-                              </button>
-
-                            </div>
-
-                          </div>
-
-                        )
-                      )
-
-                    ) : (
-
-                      <div className="empty-exercises">
-                        No exercises added yet.
-                      </div>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-              )}
-
+              <button
+                type="submit"
+                className="primary-btn"
+                disabled={saving}
+              >
+                {saving
+                  ? "Saving..."
+                  : editingId
+                  ? "Update Plan"
+                  : "Create Plan"}
+              </button>
             </div>
-
-          )
-        )}
-
-      </div>
-
-      {plans.length === 0 && (
-
-        <div className="empty-dashboard">
-          No workout plans found.
+          </form>
         </div>
-
       )}
 
+      {/* PLANS */}
+
+      <div className="content-card">
+        <div className="content-card-header">
+          <div>
+            <h2>All Workout Plans</h2>
+
+            <p>
+              {plans.length}{" "}
+              {plans.length === 1 ? "plan" : "plans"}
+            </p>
+          </div>
+
+          <button
+            className="secondary-btn"
+            onClick={loadEverything}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {plans.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">💪</div>
+
+            <h3>No workout plans yet</h3>
+
+            <p>
+              Create your first workout plan to get started.
+            </p>
+
+            <button
+              className="primary-btn"
+              onClick={openCreateForm}
+            >
+              + Create Workout Plan
+            </button>
+          </div>
+        ) : (
+          <div className="plans-list">
+            {plans.map((plan) => {
+              const planExercises =
+                exercises[plan.id] || [];
+
+              const isExpanded =
+                expandedPlan === plan.id;
+
+              return (
+                <div
+                  className="workout-plan-card"
+                  key={plan.id}
+                >
+                  {/* PLAN TOP */}
+
+                  <div className="plan-top">
+                    <div className="plan-icon">
+                      💪
+                    </div>
+
+                    <div className="plan-main">
+                      <h3>{plan.plan_name}</h3>
+
+                      <div className="plan-meta">
+                        <span>
+                          👤{" "}
+                          {getMemberName(
+                            plan.member_id,
+                            plan
+                          )}
+                        </span>
+
+                        <span>
+                          🏋️{" "}
+                          {getTrainerName(
+                            plan.trainer_id,
+                            plan
+                          )}
+                        </span>
+
+                        {plan.duration_weeks && (
+                          <span>
+                            📅 {plan.duration_weeks} weeks
+                          </span>
+                        )}
+                      </div>
+
+                      {plan.goal && (
+                        <p className="plan-goal">
+                          <strong>Goal:</strong>{" "}
+                          {plan.goal}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="plan-actions">
+                      <button
+                        className="small-btn"
+                        onClick={() =>
+                          toggleExercises(plan.id)
+                        }
+                      >
+                        {isExpanded
+                          ? "Hide Exercises"
+                          : "Exercises"}
+                      </button>
+
+                      <button
+                        className="small-btn"
+                        onClick={() =>
+                          openEditForm(plan)
+                        }
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        className="small-btn danger-btn"
+                        onClick={() =>
+                          handleDelete(plan)
+                        }
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* EXERCISES */}
+
+                  {isExpanded && (
+                    <div className="exercise-section">
+                      <div className="exercise-header">
+                        <div>
+                          <h3>Workout Exercises</h3>
+
+                          <p>
+                            Add exercises to this workout
+                            plan.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* EXERCISE FORM */}
+
+                      <div className="exercise-form">
+                        <div className="form-group">
+                          <label>
+                            Exercise Name *
+                          </label>
+
+                          <input
+                            type="text"
+                            name="exercise_name"
+                            value={
+                              exerciseForm.exercise_name
+                            }
+                            onChange={
+                              handleExerciseChange
+                            }
+                            placeholder="Bench Press"
+                          />
+                        </div>
+
+                        <div className="exercise-input-grid">
+                          <div className="form-group">
+                            <label>Sets</label>
+
+                            <input
+                              type="number"
+                              min="0"
+                              name="sets"
+                              value={
+                                exerciseForm.sets
+                              }
+                              onChange={
+                                handleExerciseChange
+                              }
+                              placeholder="3"
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label>Reps</label>
+
+                            <input
+                              type="number"
+                              min="0"
+                              name="reps"
+                              value={
+                                exerciseForm.reps
+                              }
+                              onChange={
+                                handleExerciseChange
+                              }
+                              placeholder="12"
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label>
+                              Duration (min)
+                            </label>
+
+                            <input
+                              type="number"
+                              min="0"
+                              name="duration_minutes"
+                              value={
+                                exerciseForm.duration_minutes
+                              }
+                              onChange={
+                                handleExerciseChange
+                              }
+                              placeholder="20"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Notes</label>
+
+                          <textarea
+                            name="notes"
+                            value={
+                              exerciseForm.notes
+                            }
+                            onChange={
+                              handleExerciseChange
+                            }
+                            placeholder="Optional exercise instructions..."
+                            rows="3"
+                          />
+                        </div>
+
+                        <div className="form-actions">
+                          {editingExerciseId && (
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={
+                                resetExerciseForm
+                              }
+                            >
+                              Cancel Edit
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="primary-btn"
+                            onClick={() =>
+                              saveExercise(plan.id)
+                            }
+                            disabled={saving}
+                          >
+                            {editingExerciseId
+                              ? "Update Exercise"
+                              : "Add Exercise"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* EXERCISE LIST */}
+
+                      {planExercises.length === 0 ? (
+                        <div className="exercise-empty">
+                          <span>🏃</span>
+
+                          <p>
+                            No exercises added yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="exercise-list">
+                          {planExercises.map(
+                            (exercise, index) => (
+                              <div
+                                className="exercise-row"
+                                key={exercise.id}
+                              >
+                                <div className="exercise-number">
+                                  {index + 1}
+                                </div>
+
+                                <div className="exercise-info">
+                                  <h4>
+                                    {
+                                      exercise.exercise_name
+                                    }
+                                  </h4>
+
+                                  <div className="exercise-details">
+                                    {exercise.sets !==
+                                      null &&
+                                      exercise.sets !==
+                                        undefined && (
+                                        <span>
+                                          {exercise.sets}{" "}
+                                          sets
+                                        </span>
+                                      )}
+
+                                    {exercise.reps !==
+                                      null &&
+                                      exercise.reps !==
+                                        undefined && (
+                                        <span>
+                                          {exercise.reps}{" "}
+                                          reps
+                                        </span>
+                                      )}
+
+                                    {exercise.duration_minutes !==
+                                      null &&
+                                      exercise.duration_minutes !==
+                                        undefined && (
+                                        <span>
+                                          {
+                                            exercise.duration_minutes
+                                          }{" "}
+                                          min
+                                        </span>
+                                      )}
+                                  </div>
+
+                                  {exercise.notes && (
+                                    <p className="exercise-notes">
+                                      {
+                                        exercise.notes
+                                      }
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="exercise-actions">
+                                  <button
+                                    className="small-btn"
+                                    onClick={() =>
+                                      startEditExercise(
+                                        exercise
+                                      )
+                                    }
+                                  >
+                                    Edit
+                                  </button>
+
+                                  <button
+                                    className="small-btn danger-btn"
+                                    onClick={() =>
+                                      removeExercise(
+                                        exercise,
+                                        plan.id
+                                      )
+                                    }
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

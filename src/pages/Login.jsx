@@ -2,13 +2,12 @@ import { useState } from "react";
 
 import {
   Link,
-  useNavigate
+  useNavigate,
 } from "react-router-dom";
 
 import { supabase } from "../supabase";
 
 function Login() {
-
   const navigate = useNavigate();
 
   const [email, setEmail] =
@@ -23,135 +22,156 @@ function Login() {
   const [loading, setLoading] =
     useState(false);
 
-  async function handleSubmit(e) {
-
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
     setError("");
 
-    if (!email || !password) {
-
+    if (!email.trim()) {
       setError(
-        "Please enter email and password."
+        "Please enter your email."
       );
-
       return;
     }
 
+    if (!password) {
+      setError(
+        "Please enter your password."
+      );
+      return;
+    }
+
+    if (!supabase) {
+      setError(
+        "Supabase is not configured. Please check your environment variables."
+      );
+      return;
+    }
+
+    setLoading(true);
+
     try {
-
-      setLoading(true);
-
       const {
-        error
-      } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
+        data,
+        error: loginError,
+      } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-      if (error) {
-        throw error;
+      if (loginError) {
+        setError(loginError.message);
+        return;
       }
 
-      navigate("/");
-
+      if (data?.user) {
+        navigate("/");
+      }
     } catch (error) {
+      console.error(error);
 
-      setError(error.message);
-
+      setError(
+        "Unable to login. Please try again."
+      );
     } finally {
-
       setLoading(false);
-
     }
-  }
+  };
 
   return (
     <div className="auth-page">
 
       <div className="auth-card">
 
-        <div className="auth-logo">
-          F
+        <div className="auth-header">
+
+          <div className="auth-logo">
+            💪
+          </div>
+
+          <h1>
+            Fitness Management
+          </h1>
+
+          <p>
+            Login to your account
+          </p>
+
         </div>
 
-        <h1>
-          Welcome Back
-        </h1>
-
-        <p className="auth-subtitle">
-          Sign in to FitManage
-        </p>
-
         {error && (
-          <div className="error-message">
+          <div className="alert error-alert">
             {error}
           </div>
         )}
 
-        <form
-          className="auth-form"
-          onSubmit={handleSubmit}
-        >
+        <form onSubmit={handleSubmit}>
 
-          <div className="input-group">
+          <div className="form-group">
 
-            <label>
+            <label htmlFor="email">
               Email
             </label>
 
             <input
+              id="email"
               type="email"
-              placeholder="Enter your email"
               value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
+              onChange={(event) =>
+                setEmail(
+                  event.target.value
+                )
               }
+              placeholder="Enter your email"
+              autoComplete="email"
             />
 
           </div>
 
-          <div className="input-group">
+          <div className="form-group">
 
-            <label>
+            <label htmlFor="password">
               Password
             </label>
 
             <input
+              id="password"
               type="password"
-              placeholder="Enter your password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
+              onChange={(event) =>
+                setPassword(
+                  event.target.value
+                )
               }
+              placeholder="Enter your password"
+              autoComplete="current-password"
             />
 
           </div>
 
           <button
             type="submit"
-            className="auth-button"
+            className="primary-button auth-button"
             disabled={loading}
           >
             {loading
-              ? "Signing in..."
+              ? "Logging in..."
               : "Login"}
           </button>
 
         </form>
 
-        <p className="auth-footer">
+        <div className="auth-footer">
 
-          Don't have an account?
-
-          {" "}
+          <span>
+            Don't have an account?
+          </span>
 
           <Link to="/signup">
-            Create Account
+            Sign Up
           </Link>
 
-        </p>
+        </div>
 
       </div>
 
